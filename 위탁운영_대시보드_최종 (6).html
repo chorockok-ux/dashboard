@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>위탁 운영 관리 대시보드</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root {
+    --navy: #0f1f3d;
+    --accent: #2a6ef5;
+    --accent-light: #4f8ef7;
+    --teal: #00c9a7;
+    --amber: #f5a623;
+    --red: #e84040;
+    --bg: #f4f6fb;
+    --card: #ffffff;
+    --text: #1a2340;
+    --muted: #6b7a99;
+    --border: #e2e8f4;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* 로그인 */
+  #login-screen { min-height: 100vh; background: var(--navy); display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 32px; }
+  .login-logo { text-align: center; }
+  .login-logo h1 { font-size: 26px; font-weight: 700; color: #fff; letter-spacing: -0.5px; }
+  .login-logo p { font-size: 12px; color: rgba(255,255,255,0.35); margin-top: 6px; font-family: 'DM Mono', monospace; letter-spacing: 2px; text-transform: uppercase; }
+  .login-box { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 36px 40px; width: 360px; }
+  .login-box label { display: block; font-size: 11px; color: rgba(255,255,255,0.45); margin-bottom: 8px; letter-spacing: 1px; text-transform: uppercase; }
+  .login-box input { width: 100%; padding: 12px 16px; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 15px; font-family: 'DM Mono', monospace; outline: none; transition: border-color 0.2s; }
+  .login-box input:focus { border-color: var(--accent-light); }
+  .login-btn { width: 100%; padding: 13px; background: var(--accent); color: #fff; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; font-family: 'Noto Sans KR', sans-serif; cursor: pointer; margin-top: 20px; transition: background 0.2s, transform 0.1s; }
+  .login-btn:hover { background: var(--accent-light); }
+  .login-btn:active { transform: scale(0.98); }
+  .login-error { font-size: 12px; color: #ff6b6b; text-align: center; margin-top: 10px; display: none; }
+
+  /* 대시보드 공통 */
+  #dashboard { display: none; }
+  .topbar { background: var(--navy); padding: 0 32px; height: 58px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+  .topbar-left { display: flex; align-items: center; gap: 14px; }
+  .topbar-title { font-size: 14px; font-weight: 700; color: #fff; letter-spacing: -0.3px; }
+  .topbar-badge { font-size: 10px; font-family: 'DM Mono', monospace; color: rgba(255,255,255,0.4); background: rgba(255,255,255,0.07); padding: 3px 10px; border-radius: 20px; letter-spacing: 1px; }
+  .logout-btn { font-size: 12px; color: rgba(255,255,255,0.4); background: none; border: 1px solid rgba(255,255,255,0.15); padding: 5px 14px; border-radius: 6px; cursor: pointer; font-family: 'Noto Sans KR', sans-serif; transition: all 0.2s; }
+  .logout-btn:hover { color: #fff; border-color: rgba(255,255,255,0.4); }
+  .content { padding: 26px 32px; max-width: 1300px; margin: 0 auto; }
+  .section-title { font-size: 11px; font-weight: 500; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 14px; font-family: 'DM Mono', monospace; }
+
+  /* 메트릭 카드 */
+  .metrics-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 22px; }
+  .metric-card { background: var(--card); border-radius: 12px; padding: 16px 18px; border: 1px solid var(--border); }
+  .metric-label { font-size: 12px; color: var(--muted); margin-bottom: 8px; white-space: nowrap; font-weight: 400; }
+  .metric-value { font-size: 12px; font-weight: 400; color: var(--text); font-family: 'Noto Sans KR', sans-serif; }
+  .metric-sub { font-size: 11px; color: var(--muted); margin-top: 5px; }
+  .metric-sub.up { color: var(--teal); }
+  .metric-sub.down { color: var(--red); }
+  .metric-sub.warn { color: var(--amber); }
+
+  /* 테이블 */
+  .table-card { background: var(--card); border-radius: 12px; border: 1px solid var(--border); overflow: hidden; margin-bottom: 22px; }
+  .table-header { padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .table-header h3 { font-size: 13px; font-weight: 600; }
+  .month-tabs { display: flex; gap: 4px; }
+  .month-tab { font-size: 12px; padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border); background: none; color: var(--muted); cursor: pointer; font-family: 'Noto Sans KR', sans-serif; transition: all 0.15s; white-space: nowrap; }
+  .month-tab.active { background: var(--navy); color: #fff; border-color: var(--navy); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }
+  th { background: #f8fafd; color: var(--muted); font-weight: 500; font-size: 11px; padding: 10px 8px; text-align: center; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  td { padding: 11px 8px; border-bottom: 1px solid var(--border); color: var(--text); text-align: center; white-space: nowrap; font-size: 12px; }
+  td.branch { font-weight: 600; text-align: left; padding-left: 16px; }
+  td.mono { font-family: 'DM Mono', monospace; font-size: 12px; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #f8fafd; }
+  .total-row td { background: #f8fafd; font-weight: 700; border-top: 2px solid var(--border); }
+  .status-badge { display: inline-block; font-size: 11px; padding: 3px 10px; border-radius: 20px; font-weight: 500; white-space: nowrap; }
+  .status-ok { background: #e8f9f4; color: #0a8a60; }
+  .status-warn { background: #fff8e6; color: #9a6200; }
+
+  /* 클라이언트 뷰 */
+  .client-header { background: var(--navy); border-radius: 14px; padding: 26px 30px; margin-bottom: 22px; display: flex; align-items: center; justify-content: space-between; }
+  .client-header h2 { font-size: 20px; font-weight: 700; color: #fff; }
+  .client-header p { font-size: 12px; color: rgba(255,255,255,0.45); margin-top: 4px; }
+  .settle-label { font-size: 11px; color: rgba(255,255,255,0.5); margin-bottom: 4px; text-align: right; }
+  .settle-amount { font-size: 26px; font-weight: 700; color: var(--teal); font-family: 'DM Mono', monospace; letter-spacing: -1px; }
+  .client-top-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 22px; }
+  .summary-card { background: var(--navy); border-radius: 12px; padding: 22px 26px; }
+  .summary-rows { display: flex; flex-direction: column; gap: 11px; }
+  .summary-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
+  .summary-row .sl { color: rgba(255,255,255,0.55); }
+  .summary-row .sv { font-family: 'DM Mono', monospace; color: #fff; font-weight: 500; }
+  .summary-row.minus .sv { color: #ff8080; }
+  .summary-row.total { border-top: 1px solid rgba(255,255,255,0.12); padding-top: 13px; margin-top: 2px; }
+  .summary-row.total .sl { color: #fff; font-weight: 600; font-size: 14px; }
+  .summary-row.total .sv { color: var(--teal); font-size: 18px; font-weight: 700; }
+  .chart-card { background: var(--card); border-radius: 12px; border: 1px solid var(--border); padding: 18px 22px; }
+  .chart-card h4 { font-size: 12px; font-weight: 600; margin-bottom: 14px; color: var(--muted); letter-spacing: 0.5px; text-transform: uppercase; font-family: 'DM Mono', monospace; }
+  .month-selector { display: flex; gap: 6px; margin-bottom: 18px; }
+  .month-selector button { font-size: 12px; padding: 6px 14px; border-radius: 7px; border: 1px solid var(--border); background: var(--card); color: var(--muted); cursor: pointer; font-family: 'Noto Sans KR', sans-serif; transition: all 0.15s; }
+  .month-selector button.active { background: var(--navy); color: #fff; border-color: var(--navy); }
+  .footer-note { font-size: 11px; color: var(--muted); text-align: center; padding: 10px; }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  .fade-in { animation: fadeIn 0.25s ease forwards; }
+</style>
+</head>
+<body>
+
+<div id="login-screen">
+  <div class="login-logo">
+    <h1>위탁 운영 관리 시스템</h1>
+    <p>Hospitality Management Platform</p>
+  </div>
+  <div class="login-box">
+    <label>비밀번호</label>
+    <input type="password" id="pw-input" placeholder="비밀번호를 입력하세요" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="login-btn" onclick="doLogin()">로그인</button>
+    <div class="login-error" id="login-error">비밀번호가 올바르지 않습니다</div>
+  </div>
+</div>
+
+<div id="dashboard">
+  <div class="topbar">
+    <div class="topbar-left">
+      <span class="topbar-title">위탁 운영 관리</span>
+      <span class="topbar-badge" id="topbar-badge">ADMIN</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <span style="font-size:12px;color:rgba(255,255,255,0.45)" id="topbar-user"></span>
+      <button class="logout-btn" onclick="doLogout()">로그아웃</button>
+    </div>
+  </div>
+  <div class="content" id="main-content"></div>
+</div>
+
+<script>
+const API_KEY = 'AIzaSyCoCFfmDLZtGfkxsdXCSiBV9tror6g5lqA';
+const SHEET_ID = '1DKyMuArIXMrDP6fmL6eri4yoOE7c1j53UW0ShXOFiJ0';
+
+const PASSWORDS = {
+  'admin1234': { role:'admin', name:'관리자' },
+  'branchA':   { role:'client', branch:'지점 A', name:'지점 A' },
+  'branchB':   { role:'client', branch:'지점 B', name:'지점 B' },
+  'branchC':   { role:'client', branch:'지점 C', name:'지점 C' },
+};
+
+let currentUser = null;
+let currentMonth = '1월';
+const MONTHS = ['1월','2월','3월','4월'];
+let chartInstance = null;
+let DATA = {};
+
+async function loadSheetData() {
+  try {
+    const range = '집계!A3:U5';
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}?key=${API_KEY}`;
+    const res = await fetch(url);
+    const json = await res.json();
+    if (!json.values) throw new Error('데이터 없음');
+    const rows = json.values;
+    DATA = {};
+    rows.forEach(row => {
+      const branch = row[0];
+      if (!branch) return;
+      DATA[branch] = {};
+      MONTHS.forEach((m, i) => {
+        DATA[branch][m] = {
+          현장:   parseInt((row[1+i]  || '0').replace(/,/g,'')) || 0,
+          본사:   parseInt((row[5+i]  || '0').replace(/,/g,'')) || 0,
+          매출:   parseInt((row[13+i] || '0').replace(/,/g,'')) || 0,
+          수수료: parseInt((row[17+i] || '0').replace(/,/g,'')) || 0,
+        };
+      });
+    });
+    return true;
+  } catch(e) {
+    console.error('시트 로드 실패:', e);
+    return false;
+  }
+}
+
+function fmt(n) {
+  if (n === null || n === undefined) return '—';
+  return '₩' + Math.round(n).toLocaleString('ko-KR');
+}
+function fmtShort(n) {
+  if (!n && n !== 0) return '—';
+  if (n >= 100000000) return (n/100000000).toFixed(1) + '억';
+  if (n >= 10000000) return (n/10000000).toFixed(0) + '천만';
+  if (n >= 10000) return Math.round(n/10000) + '만';
+  return n.toLocaleString();
+}
+function pct(a, b) {
+  if (!b) return null;
+  return ((a-b)/b*100).toFixed(1);
+}
+function settlement(d) {
+  return d.매출 - (d.현장 + d.본사) - d.수수료;
+}
+
+function doLogin() {
+  const pw = document.getElementById('pw-input').value;
+  const user = PASSWORDS[pw];
+  if (!user) { document.getElementById('login-error').style.display='block'; return; }
+  currentUser = user;
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+  document.getElementById('topbar-user').textContent = user.name;
+  document.getElementById('topbar-badge').textContent = user.role==='admin' ? 'ADMIN' : user.branch;
+  document.getElementById('main-content').innerHTML = '<div style="text-align:center;padding:60px"><div style="width:32px;height:32px;border:3px solid #e2e8f4;border-top-color:#2a6ef5;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px"></div><p style="color:#6b7a99;font-size:14px">데이터를 불러오는 중...</p></div>';
+  loadSheetData().then(ok => {
+    if (!ok || Object.keys(DATA).length === 0) {
+      document.getElementById('main-content').innerHTML = '<div style="text-align:center;padding:60px;color:#e84040;font-size:14px">데이터 로드 실패. 시트 공개 설정 또는 API 키를 확인하세요.</div>';
+      return;
+    }
+    renderDashboard();
+  });
+}
+
+function doLogout() {
+  currentUser = null;
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('pw-input').value = '';
+  document.getElementById('login-error').style.display = 'none';
+  if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+}
+
+function renderDashboard() {
+  currentUser.role === 'admin' ? renderAdmin() : renderClient();
+}
+
+function renderAdmin() {
+  const branches = Object.keys(DATA);
+  const prevMonth = MONTHS[MONTHS.indexOf(currentMonth)-1];
+
+  let totRevenue=0, totExpense=0, totFee=0, totSettlement=0;
+  let prevSettlement=0, prevFee=0;
+
+  branches.forEach(b => {
+    const m = DATA[b][currentMonth];
+    totRevenue += m.매출;
+    totExpense += m.현장 + m.본사;
+    totFee += m.수수료;
+    totSettlement += settlement(m);
+    if (prevMonth) {
+      prevSettlement += settlement(DATA[b][prevMonth]);
+      prevFee += DATA[b][prevMonth].수수료;
+    }
+  });
+
+  const settlementChange = prevMonth ? pct(totSettlement, prevSettlement) : null;
+  const feeChange = prevMonth ? pct(totFee, prevFee) : null;
+
+  const rows = branches.map(b => {
+    const m = DATA[b][currentMonth];
+    const prev = prevMonth ? DATA[b][prevMonth] : null;
+    const sett = settlement(m);
+    const prevSett = prev ? settlement(prev) : null;
+    const change = prevSett !== null ? pct(sett, prevSett) : null;
+    const isWarn = change && Math.abs(parseFloat(change)) > 30;
+    const changeColor = !change ? 'var(--muted)' : parseFloat(change) > 0 ? 'var(--teal)' : 'var(--red)';
+    const changeStr = change ? (parseFloat(change)>0?'+':'')+change+'%' : '—';
+    return `<tr>
+      <td class="branch">${b}</td>
+      <td class="mono">${fmt(m.매출)}</td>
+      <td class="mono" style="color:#2a6ef5">${fmt(m.본사)}</td>
+      <td class="mono" style="color:#0a8a60">${fmt(m.현장)}</td>
+      <td class="mono">${fmt(m.현장+m.본사)}</td>
+      <td class="mono">${fmt(m.매출-(m.현장+m.본사))}</td>
+      <td class="mono" style="color:#9a6200">${fmt(m.수수료)}</td>
+      <td class="mono" style="font-weight:700">${fmt(sett)}</td>
+      <td><span style="font-family:'DM Mono',monospace;font-size:12px;color:${changeColor}">${changeStr}</span></td>
+      <td><span class="status-badge ${isWarn?'status-warn':'status-ok'}">${isWarn?'확인필요':'정상'}</span></td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('main-content').innerHTML = `
+  <div class="fade-in">
+    <div class="section-title">전체 현황 — 2026년 ${currentMonth}</div>
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-label">전체 매출 합계</div>
+        <div class="metric-value">${fmtShort(totRevenue)}</div>
+        <div class="metric-sub">3개 지점 합산</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">전체 지출 합계</div>
+        <div class="metric-value">${fmtShort(totExpense)}</div>
+        <div class="metric-sub">HQ + 현장 합산</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">운영수수료 합계</div>
+        <div class="metric-value">${fmtShort(totFee)}</div>
+        <div class="metric-sub ${feeChange ? (parseFloat(feeChange)>0?'warn':'up') : ''}">${feeChange ? (parseFloat(feeChange)>0?'▲':'▼')+Math.abs(feeChange)+'% 전월비' : '전월 없음'}</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">클라이언트 정산 합계</div>
+        <div class="metric-value">${fmtShort(totSettlement)}</div>
+        <div class="metric-sub ${settlementChange ? (parseFloat(settlementChange)>0?'up':'down') : ''}">${settlementChange ? (parseFloat(settlementChange)>0?'▲':'▼')+Math.abs(settlementChange)+'% 전월비' : '전월 없음'}</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">입력 완료</div>
+        <div class="metric-value">3 / 3</div>
+        <div class="metric-sub up">전 지점 완료</div>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-header">
+        <h3>지점별 손익 현황</h3>
+        <div class="month-tabs">
+          ${MONTHS.map(m=>`<button class="month-tab ${m===currentMonth?'active':''}" onclick="switchMonth('${m}')">${m}</button>`).join('')}
+        </div>
+      </div>
+      <table>
+        <colgroup>
+          <col style="width:80px"><col style="width:110px"><col style="width:100px">
+          <col style="width:100px"><col style="width:100px"><col style="width:110px">
+          <col style="width:100px"><col style="width:110px"><col style="width:75px"><col style="width:70px">
+        </colgroup>
+        <thead>
+          <tr>
+            <th style="text-align:left;padding-left:16px">지점명</th>
+            <th>매출</th><th>HQ 지출</th><th>현장 지출</th>
+            <th>총지출</th><th>영업이익</th><th>운영수수료</th>
+            <th>정산금</th><th>정산금 증감</th><th>상태</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows}
+          <tr class="total-row">
+            <td class="branch">합계</td>
+            <td class="mono">${fmt(totRevenue)}</td>
+            <td class="mono" style="color:#2a6ef5">${fmt(branches.reduce((s,b)=>s+DATA[b][currentMonth].본사,0))}</td>
+            <td class="mono" style="color:#0a8a60">${fmt(branches.reduce((s,b)=>s+DATA[b][currentMonth].현장,0))}</td>
+            <td class="mono">${fmt(totExpense)}</td>
+            <td class="mono">${fmt(totRevenue-totExpense)}</td>
+            <td class="mono" style="color:#9a6200">${fmt(totFee)}</td>
+            <td class="mono" style="color:var(--navy)">${fmt(totSettlement)}</td>
+            <td></td><td></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+function renderClient() {
+  const branch = currentUser.branch;
+  const d = DATA[branch];
+  const m = d[currentMonth];
+  const prevMonth = MONTHS[MONTHS.indexOf(currentMonth)-1];
+  const prev = prevMonth ? d[prevMonth] : null;
+  const totalExp = m.현장 + m.본사;
+  const profit = m.매출 - totalExp;
+  const sett = settlement(m);
+  const prevSett = prev ? settlement(prev) : null;
+  const change = prevSett !== null ? pct(sett, prevSett) : null;
+
+  document.getElementById('main-content').innerHTML = `
+  <div class="fade-in">
+    <div class="client-header">
+      <div>
+        <h2>${branch}</h2>
+        <p>2026년 운영 정산 보고서</p>
+      </div>
+      <div>
+        <div class="settle-label">이번 달 정산금</div>
+        <div class="settle-amount">${fmt(sett)}</div>
+      </div>
+    </div>
+
+    <div class="month-selector">
+      ${MONTHS.map(mo=>`<button class="${mo===currentMonth?'active':''}" onclick="switchMonthClient('${mo}')">${mo}</button>`).join('')}
+    </div>
+
+    <div class="client-top-grid">
+      <div class="summary-card">
+        <div class="summary-rows">
+          <div class="summary-row">
+            <span class="sl">순매출</span>
+            <span class="sv">${fmt(m.매출)}</span>
+          </div>
+          <div class="summary-row minus">
+            <span class="sl">운영 지출</span>
+            <span class="sv">- ${fmt(totalExp)}</span>
+          </div>
+          <div class="summary-row">
+            <span class="sl">영업이익</span>
+            <span class="sv">${fmt(profit)}</span>
+          </div>
+          <div class="summary-row minus">
+            <span class="sl">운영수수료</span>
+            <span class="sv">- ${fmt(m.수수료)}</span>
+          </div>
+          ${change ? `<div class="summary-row">
+            <span class="sl">전월 대비 정산금</span>
+            <span class="sv" style="color:${parseFloat(change)>0?'#00c9a7':'#ff8080'}">${parseFloat(change)>0?'+':''}${change}%</span>
+          </div>` : ''}
+          <div class="summary-row total">
+            <span class="sl">정산금</span>
+            <span class="sv">${fmt(sett)}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <h4>월별 매출 · 정산금 추이</h4>
+        <canvas id="trend-chart" height="190"></canvas>
+      </div>
+    </div>
+    <div style="margin-bottom:24px">
+      <div style="font-size:11px;font-weight:500;color:#6b7a99;letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;font-family:'DM Mono',monospace">지출 카테고리별 상세</div>
+
+      <div style="background:#fff;border:1px solid #e2e8f4;border-radius:12px;overflow:hidden;margin-bottom:10px">
+        <div style="padding:14px 20px;display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="toggleCat('fixed')">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:13px;font-weight:600">고정비</span>
+            <span style="font-size:11px;color:#6b7a99">인건비 · 지급수수료 · 선투자비</span>
+          </div>
+          <span id="fixed-arr" style="color:#6b7a99;font-size:12px">▼</span>
+        </div>
+        <div id="fixed-body" style="display:none;border-top:1px solid #e2e8f4">
+          <div style="display:flex;justify-content:space-between;padding:10px 20px;border-bottom:1px solid #f4f6fb;font-size:13px"><span style="color:#6b7a99">도급비</span><span style="font-size:10px;color:#b0bcd4">인건비</span></div>
+          <div style="display:flex;justify-content:space-between;padding:10px 20px;border-bottom:1px solid #f4f6fb;font-size:13px"><span style="color:#6b7a99">직원 급여</span><span style="font-size:10px;color:#b0bcd4">인건비</span></div>
+          <div style="display:flex;justify-content:space-between;padding:10px 20px;border-bottom:1px solid #f4f6fb;font-size:13px"><span style="color:#6b7a99">간접인건비</span><span style="font-size:10px;color:#b0bcd4">인건비</span></div>
+          <div style="display:flex;justify-content:space-between;padding:10px 20px;border-bottom:1px solid #f4f6fb;font-size:13px"><span style="color:#6b7a99">통신비</span><span style="font-size:10px;color:#b0bcd4">지급수수료</span></div>
+          <div style="display:flex;justify-content:space-between;padding:10px 20px;border-bottom:1px solid #f4f6fb;font-size:13px"><span style="color:#6b7a99">승강기</span><span style="font-size:10px;color:#b0bcd4">지급수수료</span></div>
+          <div style="display:flex;justify-content:space-between;padding:10px 20px;border-bottom:1px solid #f4f6fb;font-size:13px"><span style="color:#6b7a99">소방</span><span style="font-size:10px;color:#b0bcd4">지급수수료</span></div>
+          <div style="display:flex;justify-content:space-between;padding:10px 20px;border-bottom:1px solid #f4f6fb;font-size:13px"><span style="color:#6b7a99">방역</span><span style="font-size:10px;color:#b0bcd4">지급수수료</span></div>
+          <div style="display:flex;justify-content:space-between;padding:10px 20px;font-size:13px"><span style="color:#6b7a99">선투자비</span><span style="font-size:10px;color:#b0bcd4">선투자비</span></div>
+        </div>
+      </div>
+
+      <div style="background:#fff;border:1px solid #e2e8f4;border-radius:12px;overflow:hidden;margin-bottom:10px">
+        <div style="padding:14px 20px;display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="toggleCat('variable')">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:13px;font-weight:600">변동비</span>
+            <span style="font-size:11px;color:#6b7a99">채널수수료 · 공과금 · 운영비</span>
+          </div>
+          <span id="variable-arr" style="color:#6b7a99;font-size:12px">▼</span>
+        </div>
+        <div id="variable-body" style="display:none;border-top:1px solid #e2e8f4">
+          <div style="display:flex;justify-content:space-between;padding:10px 20px;border-bottom:1px solid #f4f6fb;font-size:13px"><span style="color:#6b7a99">채널수수료(OTA)</span><span style="font-size:10px;color:#b0bcd4">수수료</span></div>
+          <div style="display:flex;justify-content:space-between;padding:10px 20px;border-bottom:1px solid #f4f6fb;font-size:13px"><span style="color:#6b7a99">수광비</span><span style="font-size:10px;color:#b0bcd4">공과금</span></div>
+          <div style="display:flex;justify-content:space-between;padding:10px 20px;border-bottom:1px solid #f4f6fb;font-size:13px"><span style="color:#6b7a99">세탁비</span><span style="font-size:10px;color:#b0bcd4">운영비</span></div>
+          <div style="display:flex;justify-content:space-between;padding:10px 20px;border-bottom:1px solid #f4f6fb;font-size:13px"><span style="color:#6b7a99">하우스키핑</span><span style="font-size:10px;color:#b0bcd4">운영비</span></div>
+          <div style="display:flex;justify-content:space-between;padding:10px 20px;border-bottom:1px solid #f4f6fb;font-size:13px"><span style="color:#6b7a99">여기어때 광고비</span><span style="font-size:10px;color:#b0bcd4">광고</span></div>
+          <div style="display:flex;justify-content:space-between;padding:10px 20px;border-bottom:1px solid #f4f6fb;font-size:13px"><span style="color:#6b7a99">사무용품</span><span style="font-size:10px;color:#b0bcd4">운영비</span></div>
+          <div style="display:flex;justify-content:space-between;padding:10px 20px;border-bottom:1px solid #f4f6fb;font-size:13px"><span style="color:#6b7a99">어메니티</span><span style="font-size:10px;color:#b0bcd4">운영비</span></div>
+          <div style="display:flex;justify-content:space-between;padding:10px 20px;border-bottom:1px solid #f4f6fb;font-size:13px"><span style="color:#6b7a99">복리후생</span><span style="font-size:10px;color:#b0bcd4">운영비</span></div>
+          <div style="display:flex;justify-content:space-between;padding:10px 20px;border-bottom:1px solid #f4f6fb;font-size:13px"><span style="color:#6b7a99">차량유지</span><span style="font-size:10px;color:#b0bcd4">운영비</span></div>
+          <div style="display:flex;justify-content:space-between;padding:10px 20px;font-size:13px"><span style="color:#6b7a99">세금</span><span style="font-size:10px;color:#b0bcd4">세금</span></div>
+        </div>
+      </div>
+
+      <div style="background:#fff;border:1px solid #e2e8f4;border-radius:12px;overflow:hidden">
+        <div style="padding:14px 20px;display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="toggleCat('special')">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:13px;font-weight:600">특수비</span>
+            <span style="font-size:11px;color:#6b7a99">광고 · 보험 · 기타</span>
+          </div>
+          <span id="special-arr" style="color:#6b7a99;font-size:12px">▼</span>
+        </div>
+        <div id="special-body" style="display:none;border-top:1px solid #e2e8f4">
+          <div style="display:flex;justify-content:space-between;padding:10px 20px;border-bottom:1px solid #f4f6fb;font-size:13px"><span style="color:#6b7a99">야놀자 광고비</span><span style="font-size:10px;color:#b0bcd4">광고</span></div>
+          <div style="display:flex;justify-content:space-between;padding:10px 20px;border-bottom:1px solid #f4f6fb;font-size:13px"><span style="color:#6b7a99">광고/마케팅</span><span style="font-size:10px;color:#b0bcd4">마케팅</span></div>
+          <div style="display:flex;justify-content:space-between;padding:10px 20px;border-bottom:1px solid #f4f6fb;font-size:13px"><span style="color:#6b7a99">소모품</span><span style="font-size:10px;color:#b0bcd4">운영비</span></div>
+          <div style="display:flex;justify-content:space-between;padding:10px 20px;border-bottom:1px solid #f4f6fb;font-size:13px"><span style="color:#6b7a99">영업 및 출장비</span><span style="font-size:10px;color:#b0bcd4">영업비</span></div>
+          <div style="display:flex;justify-content:space-between;padding:10px 20px;border-bottom:1px solid #f4f6fb;font-size:13px"><span style="color:#6b7a99">보험 및 보상비</span><span style="font-size:10px;color:#b0bcd4">보험</span></div>
+          <div style="display:flex;justify-content:space-between;padding:10px 20px;font-size:13px"><span style="color:#6b7a99">기타</span><span style="font-size:10px;color:#b0bcd4">기타</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer-note">매월 10일 이전 지급 · 문의: 담당 매니저</div>
+  </div>`;
+
+  if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+  const ctx = document.getElementById('trend-chart').getContext('2d');
+  chartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: MONTHS,
+      datasets: [
+        {
+          label: '매출',
+          data: MONTHS.map(mo => d[mo].매출),
+          borderColor: '#2a6ef5',
+          backgroundColor: 'rgba(42,110,245,0.07)',
+          borderWidth: 2,
+          pointRadius: 4,
+          pointBackgroundColor: '#2a6ef5',
+          tension: 0.35,
+          fill: true,
+        },
+        {
+          label: '정산금',
+          data: MONTHS.map(mo => settlement(d[mo])),
+          borderColor: '#00c9a7',
+          backgroundColor: 'rgba(0,201,167,0.07)',
+          borderWidth: 2,
+          pointRadius: 4,
+          pointBackgroundColor: '#00c9a7',
+          tension: 0.35,
+          fill: true,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { size: 11, family: 'Noto Sans KR' }, boxWidth: 12, padding: 16 } },
+        tooltip: { callbacks: { label: c => c.dataset.label + ': ₩' + c.raw.toLocaleString('ko-KR') } }
+      },
+      scales: {
+        y: {
+          ticks: { font: { size: 10 }, callback: v => v>=10000000 ? (v/10000000).toFixed(0)+'천만' : (v/10000).toFixed(0)+'만' },
+          grid: { color: '#f0f2f8' }
+        },
+        x: { ticks: { font: { size: 11 } }, grid: { display: false } }
+      }
+    }
+  });
+}
+
+
+function toggleSection(id) {
+  const detail = document.getElementById(id + '-detail');
+  const arrow = document.getElementById(id + '-arrow');
+  if (detail.style.display === 'none') {
+    detail.style.display = 'block';
+    arrow.textContent = '▲';
+  } else {
+    detail.style.display = 'none';
+    arrow.textContent = '▼';
+  }
+}
+
+function toggleCat(id) {
+  const body = document.getElementById(id + '-body');
+  const arr = document.getElementById(id + '-arr');
+  if (!body) return;
+  if (body.style.display === 'none' || body.style.display === '') {
+    body.style.display = 'block';
+    if (arr) arr.textContent = '▲';
+  } else {
+    body.style.display = 'none';
+    if (arr) arr.textContent = '▼';
+  }
+}
+
+function switchMonth(m) { currentMonth = m; renderAdmin(); }
+function switchMonthClient(m) { currentMonth = m; renderClient(); }
+</script>
+</body>
+</html>
